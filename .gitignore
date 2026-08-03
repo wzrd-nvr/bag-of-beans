@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# agent worktrees — created inside the repo; committing them yields gitlinks
+# to throwaway branches that no clone can fetch
+.claude/worktrees/
+
+# eval output
+evals/results/
+*.report.html
+
+# secrets
+.env
+.env.*
+!.env.example

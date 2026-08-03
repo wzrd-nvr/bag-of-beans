@@ -1,0 +1,31 @@
+# Guards three findings from research/frontier/field-review.md — B1, D1, D2/D14.
+#
+# SCHEMA IS PROVISIONAL. `claude plugins eval` is early access and has not run
+# these. Field names come from its --help output (runs, model, max_turns,
+# timeout_seconds, scaffold_script) and the documented case.yaml location; they
+# have not been validated by the runner. The prompt and graders are the durable
+# part.
+
+name: finds-implementation-tickets
+description: >
+  Against a corpus using /to-tickets header shapes, the skill must find all three
+  tickets, dispatch the two that only collide on package.json in parallel, and
+  hold the one whose premise the codebase disproves.
+
+runs: 3
+max_turns: 30
+timeout_seconds: 600
+
+# Read-only: scouting only. No scaffold_script — the fixture is committed and
+# nothing should write to it.
+prompt: |
+  The repository at evals/frontier/fixtures/impl-corpus/ has implementation
+  tickets under issues/. Work the frontier there, in dry-run mode.
+
+  Do not modify any file. Do not claim any ticket. Report what you would
+  dispatch, what you would hold, and why.
+
+graders:
+  - graders/finds-all-three.md
+  - graders/parallel-despite-manifest.md
+  - graders/holds-contradicted-ticket.md

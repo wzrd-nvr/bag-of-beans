@@ -1,0 +1,24 @@
+{
+  "name": "bag-of-beans",
+  "owner": {
+    "name": "Angel Nivar",
+    "url": "https://github.com/wzrd-nvr"
+  },
+  "description": "Agentic AI skills, developed in the open and evaluated against real use rather than intuition.",
+  "plugins": [
+    {
+      "name": "bag-of-beans",
+      "source": "./",
+      "description": "Skills for orchestrating agentic work — parallel ticket execution with worktree isolation, and more to come.",
+      "category": "engineering",
+      "keywords": [
+        "skills",
+        "agents",
+        "orchestration",
+        "subagents",
+        "worktrees",
+        "parallel-execution"
+      ]
+    }
+  ]
+}

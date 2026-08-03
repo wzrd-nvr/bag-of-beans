@@ -1,0 +1,22 @@
+{
+  "name": "bag-of-beans",
+  "version": "0.1.0",
+  "description": "Skills for orchestrating agentic work — parallel ticket execution with worktree isolation, and more to come.",
+  "author": {
+    "name": "Angel Nivar",
+    "url": "https://github.com/wzrd-nvr"
+  },
+  "repository": "https://github.com/wzrd-nvr/bag-of-beans",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "agents",
+    "orchestration",
+    "subagents",
+    "worktrees",
+    "parallel-execution"
+  ],
+  "skills": [
+    "./skills/orchestration/frontier"
+  ]
+}
