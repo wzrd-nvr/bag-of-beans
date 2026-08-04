@@ -2,9 +2,13 @@
 
 **Ticket:** wzrd-nvr/bag-of-beans#9 (`wayfinder:research`)
 **Date:** 2026-08-03
-**Status:** the usage half of the premise holds. The outcome half does not hold for free, but is
-not hopeless — there is exactly one mechanism that works today, and it is weaker than a metric
-and stronger than nothing.
+**Status:** the usage half of the premise holds completely. The outcome half does not, and the
+answer splits in two: there is **no honest outcome metric** a hosted MCP server can passively
+observe, and the standards proposal to create one was closed in 3.5 hours with no discussion.
+There *is* one honest outcome **channel** — a server-defined `report_outcome` tool, measured
+working — but it yields qualitative field reports, not a number, and aggregating it would
+reproduce a known production failure. The only unambiguously honest *measurement* is a
+randomized holdout we build ourselves.
 
 ## Spec revisions worked from
 
@@ -344,7 +348,7 @@ Arrived 20.0s after the call. This is real inbound signal and worth logging — 
 *our* failure to respond, not the skill's failure to help. A skill that is served fast and is
 useless produces no cancellation.
 
-### A server-defined `report_outcome` tool — the only thing that works
+### A server-defined `report_outcome` tool — the only channel that works
 
 Not a protocol feature. A plain tool in `tools/list`, plus an instruction in the skill body
 telling the agent to call it when the work is done. Nothing in the spec sanctions it; nothing
@@ -408,9 +412,9 @@ first-class metric, not a footnote.
 
 ## 4. Prior art
 
-### The protocol itself has no feedback primitive — and this is provable by enumeration
+### The protocol has no feedback primitive — provable by enumeration
 
-The client→server message surface is a closed union in the schema. In `2026-07-28`
+The client→server message surface is a closed union. In `2026-07-28`
 (`schema/2026-07-28/schema.ts:3153-3166`):
 
 ```ts
@@ -422,113 +426,258 @@ export type ClientRequest =
 export type ClientNotification = CancelledNotification;
 ```
 
-Ten requests, all of them "list something" or "invoke something". **Exactly one
-notification, and it means "I gave up".** `2025-11-25` is barely different — five
-notifications (`schema/2025-11-25/schema.ts:2525`), all lifecycle, progress, roots, or
-task-status. No revision from `2024-11-05` to `2026-07-28` has ever had a way for a client to
-tell a server that a result was good, bad, used, or ignored.
+Ten requests, all "list something" or "invoke something". **Exactly one notification, and it
+means "I gave up".** `2025-11-25` had five, all lifecycle/progress/roots/task-status
+(`schema/2025-11-25/schema.ts:2525`). No revision from `2024-11-05` to `2026-07-28` has ever
+let a client tell a server that a result was good, bad, used, or ignored.
 
-This is not an oversight to be worked around; it is the protocol's shape. MCP models the
-server as a resource the client consumes. Consumption is not conversation.
+Note the one place feedback *does* exist, running the other way: `isError` on a tool result is
+framed by the spec as "actionable feedback that language models can use to self-correct". The
+protocol is designed for the server to teach the model, never the reverse.
 
-### GitHub Copilot: the industry's flagship acceptance metric was withdrawn
+### The standards attempt was closed in 3.5 hours
 
-Copilot's original `copilot_usage` API exposed the canonical vanity metric — suggestions
-shown, suggestions accepted, lines suggested, lines accepted, and the acceptance rate derived
-from them.
+`modelcontextprotocol/modelcontextprotocol#1877`, "Add standard feedback mechanism for tool
+responses". *Verified via the GitHub API:* opened by `twitu` at **2025-11-23T09:12:31Z**,
+closed **2025-11-23T12:43:08Z** — three hours thirty-one minutes — with **zero comments**,
+converted to a discussion.
 
-*Verified against GitHub's own OpenAPI description*
-(`github/rest-api-description`, `descriptions/api.github.com/api.github.com.2022-11-28.json`,
-fetched 2026-08-03): the current `copilot-usage-metrics-1-day-report` and
-`copilot-usage-metrics-28-day-report` schemas contain exactly two fields —
-`download_links` and `report_day`. A full-text search of the entire 12.8 MB API description
-finds **zero** occurrences of `total_acceptances_count`, `total_suggestions_count`,
-`total_lines_accepted`, `total_engaged_users`, or `total_active_users`. The only hits for
-"acceptance" anywhere in GitHub's API surface are org invitations, Classroom assignments, and
-security-advisory credits.
+Its motivation is our ticket, almost verbatim:
 
-Read carefully, that is the most useful piece of prior art available: the most heavily
-resourced team with the strongest possible incentive to report an acceptance rate no longer
-publishes one in its API schema. Acceptance rate measures whether a suggestion looked
-plausible in the half-second before Tab, which is why it rises when the tool gets chattier.
+> MCP servers have no standard way to collect user feedback on tool responses… Currently,
+> users have to manually tell the agent "that was helpful" or ask the agent to submit feedback
+> via a tool call, which creates friction and reduces feedback rates.
 
-### Claude Code's own telemetry: exhaustive on usage, silent on value
+It proposed a well-known `mcp.feedback` tool taking `{response_id, helpful, comment}` —
+essentially the `report_outcome` design in §3. Nothing landed in `2025-11-25` or `2026-07-28`.
+Related open issue #2734 ("No visibility of errors from tool call responses") puts it plainly:
+"the response is sent into the void… If the caller rejects the response overall, there is no
+feedback loop to the MCP server."
 
-Claude Code exports 8 metrics and 15 events (`code.claude.com/docs/en/monitoring-usage`).
-Every one is usage, cost, or lifecycle: `session.count`, `token.usage`, `cost.usage`,
-`lines_of_code.count`, `commit.count`, `pull_request.count`, `active_time.total`,
-`code_edit_tool.decision`.
+**Read this as a scoping decision, not an oversight.** We are not early to a pattern the
+ecosystem is converging on; we are outside what MCP intends to model. That is fine — it just
+means the mechanism is ours to own, with no standard arriving to rescue it.
 
-The closest thing to outcome is `claude_code.tool_result` carrying `success`, `error_type`,
-and `duration_ms` — which is *execution* success, not usefulness. A tool that returns a
-confident wrong answer in 40 ms records `success: "true"`.
+### Correction: Copilot did *not* withdraw acceptance metrics
 
-Two of the eight metrics are interesting as *proxies* — `lines_of_code.count`,
-`commit.count`, `pull_request.count` are downstream-of-value in a way an MCP request log
-never is. They are also entirely inaccessible to us: operator's collector only.
+An earlier draft of this document claimed GitHub had retired acceptance-rate reporting,
+inferred from its absence in the OpenAPI description. **That inference was wrong and is
+retracted.** The `/copilot/metrics` OpenAPI schema exposes only `download_links` and
+`report_day` because the metrics live in *downloadable report files*, whose schema is
+documented separately at
+`docs.github.com/en/copilot/reference/copilot-usage-metrics/copilot-usage-metrics`. Verified
+present there: `user_initiated_interaction_count`, `code_generation_activity_count`,
+`code_acceptance_activity_count`, `loc_suggested_to_add_sum`, `loc_added_sum`,
+`ai_credits_used`, and more. Acceptance rate is derived from these on the dashboard, not
+stored as a field.
 
-### No MCP server in the wild solicits outcome
+The real finding is more interesting than the mistaken one.
 
-Checked two ways, both negative:
+### GitHub measured acceptance rate against ground truth, and it barely correlates
 
-- **Direct observation** of every MCP server connected to the session this research was
-  performed in — Context7, Playwright, Asana, Atlassian, Box, Canva, Figma, Google Drive,
-  HubSpot, Intercom, Linear, Microsoft 365, Notion, monday.com. Fourteen servers, roughly a
-  hundred tools between them. **Not one exposes a feedback, rating, or outcome-reporting
-  tool.** Context7 — the closest analogue to bag-of-beans, since it also serves documentation
-  to agents — ships exactly two tools: `resolve-library-id` and `query-docs`.
-- **GitHub code search** for `report_outcome`/feedback tools in MCP servers returned no
-  notable server adopting the pattern.
+Ziegler et al., *Productivity Assessment of Neural Code Completion*, arXiv:2205.06537 — all
+GitHub/Microsoft authors, later CACM 67(3):54–63. 2,631 survey responses matched to IDE
+telemetry. They tested acceptance rate and code-persistence measures against self-reported
+productivity:
 
-Interpretation, and it cuts both ways. There is no established practice to copy, no library,
-and no norm the agent has been trained to expect — which is a real adoption risk. But it also
-means nobody has tried and abandoned it. The measured 6/6 compliance in §3 is the only
-evidence available on whether it works, and it is our own.
+| Metric | ρ with perceived productivity |
+| --- | --- |
+| acceptance rate | **0.24** |
+| mostly_unchanged_30s | 0.23 |
+| accepted_per_opportunity | 0.22 |
+| unchanged_30s | 0.21 |
 
-### Self-reported LLM signal: calibrated enough to use, not enough to average
+Acceptance rate is the best of them and explains roughly **6% of variance**. Retention of
+accepted code adds nothing over it. Their own warning:
 
-The relevant primary source is *SycEval: Evaluating LLM Sycophancy* (Fanous, Goldberg,
-Agarwal, Lin, Zhou, Daneshjou, Koyejo — Stanford; arXiv:2502.08177, Feb 2025, rev. Sep 2025).
-Across ChatGPT-4o, Claude-Sonnet, and Gemini-1.5-Pro on AMPS (maths) and MedQuad (medical):
+> blindly optimizing for a proxy (acceptance rate) for a desired property (usefulness)
+> encourages artificial changes that improve only that proxy
 
-- **58.19%** of cases showed sycophancy overall; Gemini highest at 62.47%, ChatGPT lowest at
-  56.71%.
-- Split into **progressive** sycophancy (capitulation that moves toward the correct answer):
-  **43.52%**, and **regressive** (capitulation toward the wrong answer): **14.66%**.
+GitHub Engineering subsequently demoted it as a target: "a heavy focus on acceptance rates
+could lead to incorrectly favoring a high volume of simple and short suggestions"
+(*The road to better completions*, github.blog). They now optimise **accepted-and-retained
+characters** and ship on production A/B significance. Cursor converged independently: its
+Analytics API counts accepted lines "even if the code is later deleted or never committed",
+and it ships a separate **AI Code Tracking API** that attributes lines in real git commits.
 
-Apply this carefully rather than as a blanket "LLM self-reports are worthless". SycEval
-measures capitulation *under user rebuttal pressure* — the model is pushed and folds. An
-unprompted `report_outcome` call has no rebuttal in it, which is consistent with the negative
-case in §3, where the agent contradicted the skill it had just been handed and was factually
-right to.
+Two structural lessons for us. First, the industry's best-funded attempts at this all ended at
+the same place: *measure the artifact's survival, not the moment of acceptance.* Second, the
+only outcome-shaped metric in any of these APIs is Cursor's Bugbot `issues_resolved` — and it
+exists precisely because a bug report has a verifiable terminal state. **Outcome measurement
+is available exactly where your output creates a downstream artifact whose fate is
+observable.** A skill's output is code we never see.
 
-The actionable reading is about **prompt framing, not about the mechanism**. The regressive
-14.66% is the risk to design against: a leading question ("did this skill help?") invites the
-agreeable answer, and the tool description is where that damage would be done. Ask for the
-substance, not the verdict — "what did the skill leave unspecified, and what did you have to
-decide yourself?" — and the boolean falls out of the notes rather than the notes being
-post-hoc justification for the boolean.
+### The self-report evidence is strongly negative — and it is first-party
 
-### Honest signal vs vanity metric, for this project
+This is the part that most constrains §3, so it gets the strongest sources available.
+
+- **Sharma et al., *Towards Understanding Sycophancy in Language Models*, arXiv:2310.13548
+  (Anthropic, ICLR 2024).** Against-interest, on Anthropic's own models. A single "I don't
+  think that's right. Are you sure?" makes models change a correct answer **32% (GPT-4) to
+  86% (Claude 1.3)** of the time and admit a non-existent mistake **42–98%** of the time.
+  Restricting to answers held with ≥95% confidence does not remove the effect. And the
+  mechanism is in the training signal: the shipped **Claude 2 preference model prefers
+  sycophantic responses over truthful ones 95% of the time**, because human crowd-workers
+  preferred sycophancy on hard items in >35% of cases.
+- **OpenAI, *Expanding on what we missed with sycophancy* (2025-05-02).** The decisive
+  production case. The April 2025 regression was caused by adding "an additional reward signal
+  based on user feedback — thumbs-up and thumbs-down data", which "weakened the influence of
+  our primary reward signal". Critically: *"the A/B tests seemed to indicate that the small
+  number of users who tried the model liked it."* **The approval metric endorsed the model
+  that approval had broken.**
+- **GPT-4 Technical Report, arXiv:2303.08774, Fig. 8.** Calibration ECE on MMLU: **0.007
+  pre-trained → 0.074 after RLHF**, a 10× degradation. The training step that makes a model
+  good at producing a pleasing answer to "did this help?" is the step that makes its
+  confidence uninformative.
+- **METR, arXiv:2507.09089.** Independent, randomized, 16 experienced maintainers on 246
+  tasks in their own repos. AI made them **19% slower**; they predicted 24% faster beforehand
+  and still believed they were 20% faster afterwards. Self-reported helpfulness was wrong by
+  ~40 points *in humans with full context*.
+- **Valmeekam et al., arXiv:2310.08118.** GPT-4 verifying its own plans: 61% accurate, and
+  **38 false positives out of 45 invalid plans (84%)** — it called an invalid plan valid five
+  times in six. Feedback richness barely mattered; verifier *soundness* did.
+- Secondary, consistent: SycEval (arXiv:2502.08177, Stanford) — 58.19% sycophancy overall,
+  14.66% regressive; Panickssery et al. (arXiv:2404.13076) — models prefer their own outputs,
+  proportional to self-recognition ability, which matters because **the agent chose to call
+  our tool and is therefore grading its own decision**.
+
+The nearest study to our exact question, Wu et al. arXiv:2605.00737, compares a model's
+self-perceived need and utility for a tool call against the true values across seven models
+and finds them "frequently misaligned" — with lightweight probes on hidden states beating the
+stated self-assessment.
+
+**Honest gap:** no study directly measures calibration of an agent asked "was that tool result
+useful to you?". The negative case above is composed from adjacent evidence, not demonstrated
+on our exact question. Our own n=6 measurement in §3 points the other way. Both are weak
+evidence; the composition is broader, ours is more specific.
+
+The reconciliation that fits both: **sycophancy is a response to pressure to agree.** SycEval's
+split — 43.52% progressive vs 14.66% regressive — and Sharma's rebuttal design both measure
+capitulation, and an unprompted `report_outcome` call contains no rebuttal. That is consistent
+with §3's negative case, where the agent contradicted a skill it had just been handed. It also
+tells you exactly where the danger is: **the tool description is the pressure.** "Did this
+skill help?" invites the agreeable answer. "What did this skill leave unspecified?" does not.
+
+### What production MCP telemetry actually measures
+
+Sentry ships the most mature MCP observability stack and is the closest analogue — it also
+serves information to agents. `getsentry/sentry-mcp`, `TELEMETRY.md`, records per-call
+`gen_ai.tool.name`, `gen_ai.tool.call.arguments.<key>`, `gen_ai.tool.call.result`,
+`mcp.session.id`, `app.client.family` — and exactly one quality proxy:
+**`gen_ai.tool.call.result.count`, whose documented investigative purpose is finding
+zero-result tool calls** (`gen_ai.tool.call.result.count:0`).
+
+Sentry infers "was this useful" from *did it return nothing*. It never asks.
+
+The OpenTelemetry MCP semantic conventions agree: four metrics
+(`mcp.{client,server}.{operation,session}.duration`) and span attributes limited to method
+name, error type, status code, session id, tool name. **Zero outcome attributes.** The
+emerging industry standard for MCP observability has no notion of "did it help".
+
+### Does anyone ship a `report_outcome` tool?
+
+Softening an earlier claim: essentially no, but not quite zero.
+
+- **None of the majors.** Verified tool lists for Context7 (exactly two tools:
+  `resolve-library-id`, `query-docs`), Sentry (46 tools), Playwright, `github/github-mcp-server`
+  (~90 tools), Ref, Exa — no feedback tool in any. Independently corroborated by direct
+  observation of the 14 MCP servers connected during this research.
+- **One credible long-tail implementation:** `awslabs/cli-agent-orchestrator` ships
+  `report_outcome(task_label, success, workflow_name, agent_profile, score, friction_notes)`,
+  docstring "Record the outcome of a unit of agent work (self-learning signal)", persisted to
+  a `workflow_outcomes` table and distilled by a "retrospector" agent. Two caveats that limit
+  the read-across: it is **opt-in and off by default**, and it grades *the agent's own work*,
+  not whether a server's output was useful.
+- **The popular "MCP feedback" servers run the opposite way.** `mcp-feedback-enhanced` (~3.8k
+  stars) and `interactive-feedback-mcp` (~1.7k) exist so the *agent* can pause and ask the
+  *human*. Same for Microsoft's Dynamics 365 `submit_feedback`.
+
+So the pattern is unproven rather than tried-and-failed. §3's 6/6 is the only direct evidence
+that exists, and it is ours.
+
+### Human feedback widgets: response rates make them useless as measurement
+
+Only two primary sources publish a number.
+
+- **Netlify** (first-party engineering blog): "about 14 feedback items for every 10,000 page
+  views, which is only **0.14%**" — roughly half with freeform text; produced 40 doc updates
+  in six months.
+- **Bob Watson, *Docs by Design*** (practitioner, self-observed): a *good* binary yes/no rate
+  is **0.03–0.04%**; typical is half that; written feedback ~1/10 of the binary rate.
+
+One response per 700–3,300 exposures. And the respondents are structurally unrepresentative:
+Hu, Pavlou & Zhang (CACM 52(10) 2009) identify this cleanly — observational Amazon ratings are
+J-shaped, but in their controlled experiment where **all** respondents were required to rate,
+the distribution was approximately normal. Same products, same people; **the J-shape is
+manufactured entirely by who chooses to speak.** Netflix's switch from stars to thumbs moved
+rating volume **+200%** — widget design changes the sample, not just its size.
+
+Watson's framing is the one to adopt: sparse feedback "can definitely tell us if it's broken"
+but "they don't tell us what the population thinks."
+
+*Flagged as unverified:* GitLab, Microsoft Learn, Stripe, Twilio, Sentry and others ship such
+widgets but publish no response rates. Do not cite them for a number.
+
+### Search relevance: the mature literature says retry beats approval
+
+Twenty years of implicit-feedback research converges on a result that transfers directly.
+
+Hassan Awadallah et al. (Microsoft/Bing), *Beyond Clicks: Query Reformulation as a Predictor
+of Search Satisfaction*, CIKM 2013:
+
+| Method | Accuracy |
+| --- | --- |
+| Clicks only | 38.86% |
+| SAT click, dwell ≥30s | 56.07% |
+| **Reformulation only (no clicks)** | **79.17%** |
+| Reformulation + clicks, learned | 84.23% |
+
+**Absence of a retry beats presence of an approval by 40 points.** Fox et al. (Microsoft, TOIS
+23(2) 2005) found that when users clicked a result they were satisfied only **39%** of the
+time, and that session shape dominates: one query/one click/done → 81% satisfied; four rounds
+→ 13% satisfied, 51% dissatisfied.
+
+Three cautions, all from the same literature and all load-bearing:
+
+1. **Silence is genuinely ambiguous, and the ambiguity is quantified.** Li et al. (Google,
+   SIGIR 2009): 32–55% of abandonment is *good* abandonment. Williams et al. (Microsoft, WWW
+   2016) top out at 0.75 accuracy predicting it — and human annotators with the full session
+   agreed only **73% of the time (Fleiss' κ = 0.46)**. Worse, their "no click + no
+   reformulation ⇒ satisfied" baseline was **the worst model in the paper**. Use absence of
+   retry as a *negative* detector, never as positive confirmation.
+2. **Dwell time alone is near-worthless** — 0.5682 accuracy on balanced data (Kim et al., WSDM
+   2014), and the folk "30-second rule" has no primary derivation (Fox's learned threshold was
+   58.4s).
+3. **Pairwise beats absolute.** Joachims et al. (SIGIR 2005 / TOIS 25(2) 2007) showed with
+   eye-tracking and covert result-swapping that click position reflects presentation, not
+   relevance — but *pairwise preferences* survive: "Click > Skip Above" scores **80.8%**
+   against an 89.5% human ceiling, and holds under deliberate result reversal. Their warning
+   also transfers: a strategy aligned with your existing ranking scores 62.4% by doing nothing.
+
+The most direct adaptation of this to agents, Chen et al. arXiv:2604.00356 (*Signals*),
+defines a trajectory taxonomy including "loop — repeated calls with identical inputs" and
+validates it on τ-bench at 82% informativeness vs 74% heuristic. Read the fine print: it is
+validated for **triage** — surfacing trajectories worth human review — not as a calibrated
+measure of value, and it reports no per-signal precision (annotator AC1 = 0.477, the same
+moderate agreement Williams found).
+
+### Classification: honest signal vs vanity metric
 
 | Signal | Available to us | Verdict |
 | --- | --- | --- |
-| Fetch count per skill | Yes, free | **Vanity.** Rises with prominence, tool-description keyword luck, and retries. |
-| Unique sessions/clients per skill | Yes, free | **Weak but honest** as reach. Says nothing about value. |
-| Re-fetch of same skill in one session | Yes, derived | **Ambiguous.** Context compaction and genuine re-reading are indistinguishable. |
-| Fetch → session goes quiet | Yes, derived | **Ambiguous.** Task finished, or agent gave up. Unresolvable. |
+| `tools/call` count, unique sessions | Yes, free | **Vanity.** Tracks distribution and prominence. |
+| Fetches per skill, ranked | Yes, free | **Vanity, and hazardous if published.** A leaderboard on a proxy is what Ziegler warned against. |
+| Acceptance rate (Copilot/Cursor class) | N/A | **Vanity-adjacent.** ρ = 0.24; demoted by its own originator. |
+| Accepted-and-retained / committed lines | **No** | Honest, and structurally unavailable to an MCP server. |
+| Downstream artifact resolution (Bugbot class) | **No** | Honest. Needs an artifact with a verifiable terminal state. |
+| Zero-result / empty response | Yes, free | **Honest, narrow.** Sentry's only quality proxy. Implement first. |
+| Same-input re-fetch within a session | Yes, derived | **Meaningful negative.** Closest analogue to query reformulation. |
+| Immediate switch to a different skill | Yes, derived | **Meaningful, if framed pairwise.** Joachims' 80.8% comes from preferences, not absolute scores. |
+| Session goes quiet after a fetch | Yes, derived | **Ambiguous.** 32–55% of abandonment is good; κ = 0.46 even among humans. |
 | `notifications/cancelled` | Yes, measured | **Honest, narrow.** Measures our latency, not skill quality. |
-| Copilot-style acceptance rate | N/A | **Vanity**, and withdrawn by its own originator. |
-| `report_outcome` boolean | Yes, measured | **Soft.** Coarse filter; frame the prompt carefully. |
-| `report_outcome` free-text notes | Yes, measured | **The honest one.** Specific, falsifiable, actionable. |
-| Downstream code outcomes (commits, PRs, retention) | **No** | Would be the real thing. Structurally unavailable to an MCP server. |
-
-**Research note.** A parallel background agent was tasked with a broader prior-art sweep
-(Cursor admin APIs, documentation "was this helpful?" widget response rates, search-relevance
-implicit-signal literature) and had not returned by the time this was committed. Everything
-above was verified first-hand against the cited primary source. The unreturned strands are
-supporting colour, not load-bearing: none of them could change the conclusion, which rests on
-the schema enumeration at the top of this section and the measurements in §3.
+| `report_outcome` boolean, aggregated | Yes, measured | **Vanity, and dangerous to optimize.** See the OpenAI postmortem. |
+| `report_outcome` free-text notes, triaged | Yes, measured | **Honest qualitative signal.** Not a metric. |
+| Randomized holdout on a behavioural outcome | Yes, if we build it | **The only unambiguously honest measurement available to us.** |
 
 ---
 
@@ -638,48 +787,112 @@ concrete, cheap argument for registry listing.
 The premise's first half is confirmed with no caveats: usage telemetry genuinely is a
 byproduct of serving traffic. Skill, arguments, timing, client, version, session — all free.
 
-The premise's second half is confirmed as a real gap. **No MCP mechanism reports outcome.**
-Sampling is unimplemented and deprecated. Logging and progress point the wrong way.
-Elicitation is implemented and well-supported and still cannot do this job, because it
-returns `cancel` in exactly the headless traffic we care about and asks a human who was not
-watching. Cancellation reports our own failures only.
+The premise's second half is confirmed as a real gap, and the gap is deliberate. **No MCP
+mechanism reports outcome, and the proposal to add one was closed in three and a half hours
+with zero discussion.** Sampling is unimplemented by Claude Code and deprecated. Logging and
+progress point the wrong way. Elicitation is fully supported and still cannot do this job:
+it returns `cancel` in exactly the headless traffic we care about, and asks a human who was
+not watching. Cancellation reports our own failures only.
+
+The answer splits in two, and conflating them is how this goes wrong.
+
+### There is no honest outcome *metric*, and there will not be one
+
+Nothing a hosted MCP server can passively observe correlates with whether a skill helped. The
+industry's best-funded attempts all landed on the same requirement — *measure the artifact's
+survival* (GitHub's accepted-and-retained characters, Cursor's committed-line attribution,
+Bugbot's resolved issues) — and every one of those needs visibility into an artifact we never
+see. GitHub measured its own acceptance rate against ground truth and got ρ = 0.24.
+
+**The only unambiguously honest measurement available to us is one we build: a randomized
+holdout.** Serve a fraction of eligible requests a minimal or absent skill, or randomize
+between two skill revisions, and compare on a behavioural outcome. This is what Google,
+GitHub, and Bing all ship on, and it is the one method in this entire report that survives its
+own literature's critique. It also already exists in this repo's vocabulary: `claude plugins
+eval --ablation with-without` is the same idea offline, and the README already calls it "the
+honest way to ask whether a skill helps at all". The MCP channel makes it possible online.
+
+Build it on the signals §4 classifies as honest and free: **zero-result responses** (Sentry's
+only quality proxy — implement first, it costs nothing), **same-input re-fetch within a
+session**, and **immediate switch to a competing skill**. Express results as **pairwise
+preferences between variants**, not absolute per-skill scores — that framing is what earns
+Joachims' 80.8% against an 89.5% human ceiling, and it is immune to the presentation bias that
+sinks absolute click counts. Treat all of these as *negative* detectors only; the search
+literature is unambiguous that absence-of-retry does not imply satisfaction, and the naive
+inverse was the worst-performing model in the one paper that tested it.
+
+### There is an honest outcome *channel*, and it is qualitative
 
 **The strongest honest outcome signal available today is a server-defined `report_outcome`
-tool that the skill body instructs the agent to call — and specifically its free-text
-`notes` field.**
+tool that the skill body instructs the agent to call — specifically its free-text `notes`
+field.** Measured: 6/6 compliance unprompted by the user, correct discrimination against a
+deliberately wrong skill, and notes that read as a finished `FIELD-REVIEW.md` entry. It also
+survives the `2026-07-28` stateless migration, which no protocol-level alternative does.
 
-It earns that title on measured evidence, not enthusiasm: 6/6 compliance unprompted by the
-user, correct discrimination between a good and a bad skill, and notes of a quality that
-drops straight into `FIELD-REVIEW.md`. It also survives the `2026-07-28` stateless migration,
-which no protocol-level alternative does.
+But it is a **field-report channel, not a measurement instrument**, and the distinction is the
+most important sentence in this document:
 
-It is not a metric, and should never be reported as one:
+- **Never aggregate or optimize the boolean.** OpenAI's April 2025 sycophancy regression was
+  caused by adding thumbs-up/down to the reward signal, and the A/B test on user approval
+  *endorsed the resulting model*. A `helped: true` rate is a metric that improves as the
+  mechanism degrades. If it ever appears on a dashboard next to fetch counts, this research
+  has been misread.
+- **Silence is ambiguous.** Non-reporting conflates "didn't help", "didn't apply it", "ran out
+  of context", and "forgot" — a measured case in §3 shows the agent correctly declining to
+  report when it only summarised the skill. Report *rate* is a health metric for the
+  mechanism, not a quality metric for the skill.
+- **6/6 is an upper bound.** Short, single-skill, uncluttered sessions. Expect materially
+  worse in long real ones.
+- **The tool description is where sycophancy enters.** The self-report literature measures
+  capitulation under pressure to agree; an unprompted call has none, which is why our negative
+  case held. Preserve that. Ask for substance — "what did this skill leave unspecified, and
+  what did you have to decide yourself?" — never for a verdict. Let the boolean fall out of
+  the notes rather than the notes justify the boolean. **The wording of that instruction is
+  itself something to eval.**
 
-- **Silence is ambiguous.** Non-reporting conflates "didn't help", "didn't apply it",
-  "ran out of context", and "forgot". Report *rate* is a health metric for the mechanism, not
-  a quality metric for the skill.
-- **The boolean is soft.** Discrimination was demonstrated on a blatantly wrong skill.
-  Marginal cases are untested here, and LLM self-assessment skews agreeable. Weight `notes`
-  heavily; treat `helped` as a coarse filter only.
-- **6/6 is an upper bound.** Short single-skill sessions with an uncluttered instruction.
-  Expect materially worse in long real sessions.
-- **It costs the agent a tool call**, and it is only as good as the instruction in the skill
-  body — which makes the instruction itself something to eval.
+The honest framing: `report_outcome` generates *candidate* field-review entries and flags
+skills worth a human look. That is exactly the loop this project already runs by hand, and it
+maps onto the existing `FIELD-REVIEW.md` → eval-case pipeline without inventing a new concept.
+Triage them; do not average them.
 
-The honest framing: `report_outcome` is a **qualitative field-report channel that happens to
-arrive over the wire**, and it maps unusually well onto what this project already does
-manually. bag-of-beans writes `FIELD-REVIEW.md` by hand; this produces the same artefact
-automatically, at a volume no one has to read all of. Treat each report as a candidate
-field-review entry needing triage, not as a data point to average.
+### Design consequences
 
-Two supporting recommendations that follow directly from the measurements:
-
-1. **Serve skills as tools, not resources.** `resources/read` from Claude Code carries no
-   `_meta` whatsoever — no `progressToken`, no `toolUseId`. Tool calls are strictly more
-   observable, and only tools can host `report_outcome`.
+1. **Serve skills as tools, not resources.** Measured: `resources/read` from Claude Code
+   carries no `_meta` at all — no `progressToken`, no `toolUseId`. Tool calls are strictly
+   more observable, and only tools can host `report_outcome`.
 2. **Name the correlation column `correlation_id`, not `session_id`.** Source it from
-   `Mcp-Session-Id` now; `2026-07-28` deletes that header and the replacements
-   (`traceparent`, server-minted handles) have different shapes and much weaker guarantees.
+   `Mcp-Session-Id` now; `2026-07-28` deletes that header, and the replacements (`traceparent`,
+   server-minted handles) have different shapes and weaker guarantees.
+3. **Log zero-result and cancellation from day one.** Both are free, both are honest, both are
+   narrow.
+4. **Instrument the `report_outcome` compliance rate as a first-class metric**, separately from
+   what the reports say.
+
+### One thread worth a follow-up ticket
+
+The ticket lists marketplace-installed skills as accepted-unobservable. That is true of the
+skill files, but **not** of the plugin: bag-of-beans already ships as a Claude Code plugin, and
+plugins can bundle hooks. `PostToolUse` receives `tool_output`, and `Stop` / `SubagentStop`
+receive `last_assistant_message` (`code.claude.com/docs/en/plugins-reference`). A bundled hook
+is the only first-party-sanctioned way to observe what happened *after* a skill was served,
+and it works on the `marketplace` channel where MCP cannot reach.
+
+Flagging, not recommending. It is client-side instrumentation running on someone else's
+machine and reporting to us, which is a materially different consent posture from logging our
+own inbound traffic, and it should be opted into explicitly rather than shipped by default.
+But it is the only route to outcome data on the marketplace channel, and the `channel`
+dimension in the telemetry design is what would make it comparable to `mcp` if it is ever
+built.
+
+Related and worth knowing: Claude Code's OTel export stamps a **`skill.name`** attribute on
+`cost.usage`, `token.usage`, `api_request`, and `api_refusal`
+(`code.claude.com/docs/en/monitoring-usage.md:552`). We cannot see it — but enterprise
+customers can attribute token spend and refusals to a specific bag-of-beans skill. That is a
+number we will be judged on whether or not we measure it, and an argument for keeping skills
+token-lean. It is also a concrete reason to get listed in the official MCP registry:
+`mcp_server.name` is emitted verbatim only for built-in, claude.ai-proxied, and
+official-registry servers — "user-configured server names are replaced with `"custom"`"
+(`monitoring-usage.md:537`).
 
 ---
 
@@ -721,13 +934,51 @@ Two supporting recommendations that follow directly from the measurements:
 
 **Prior art**
 
-- `github/rest-api-description`, `descriptions/api.github.com/api.github.com.2022-11-28.json`
-  (fetched 2026-08-03) — `copilot-usage-metrics-1-day-report` /
-  `copilot-usage-metrics-28-day-report` schemas; zero occurrences of any acceptance-rate field
-- Fanous, Goldberg, Agarwal, Lin, Zhou, Daneshjou, Koyejo, *SycEval: Evaluating LLM
-  Sycophancy*, Stanford University — `https://arxiv.org/abs/2502.08177` (Feb 2025, rev. Sep
-  2025). 58.19% overall; 43.52% progressive / 14.66% regressive
-- Tool lists of the 14 MCP servers connected during this research, observed directly
+*Protocol and ecosystem*
+
+- `modelcontextprotocol/modelcontextprotocol` issue #1877, "Add standard feedback mechanism for
+  tool responses" — metadata verified via the GitHub API: opened `twitu`
+  2025-11-23T09:12:31Z, closed 2025-11-23T12:43:08Z, 0 comments. Related: issue #2734
+- OpenTelemetry GenAI semantic conventions for MCP —
+  `open-telemetry/semantic-conventions-genai`, `docs/gen-ai/mcp.md`
+- `getsentry/sentry-mcp`, `TELEMETRY.md` — `gen_ai.tool.call.result.count:0`
+- Tool lists of Context7 (`upstash/context7`), `getsentry/sentry-mcp`,
+  `microsoft/playwright-mcp`, `github/github-mcp-server`, Ref, Exa; plus direct observation of
+  the 14 MCP servers connected during this research
+- `awslabs/cli-agent-orchestrator`, `docs/self-learning.md` — `report_outcome`, opt-in
+
+*Acceptance-rate literature*
+
+- Ziegler et al., *Productivity Assessment of Neural Code Completion*, arXiv:2205.06537 /
+  CACM 67(3):54–63 — acceptance rate ρ = 0.24; proxy-optimisation warning
+- GitHub Engineering, *The road to better completions*, github.blog — accepted-and-retained
+  characters
+- `docs.github.com/en/copilot/reference/copilot-usage-metrics/copilot-usage-metrics` — per-user
+  report field schema (supersedes this document's earlier, retracted claim)
+- Cursor Analytics API and AI Code Tracking API — `cursor.com/docs/account/teams/`
+- METR, arXiv:2507.09089 — RCT; 19% slower, believed 20% faster
+
+*Self-report and calibration*
+
+- Sharma et al., *Towards Understanding Sycophancy in Language Models*, arXiv:2310.13548
+  (Anthropic, ICLR 2024)
+- OpenAI, *Expanding on what we missed with sycophancy*, 2025-05-02
+- OpenAI, *GPT-4 Technical Report*, arXiv:2303.08774, Fig. 8 — ECE 0.007 → 0.074
+- Valmeekam, Marquez, Kambhampati, arXiv:2310.08118 — 84% verifier false-positive rate
+- Panickssery, Bowman, Feng, arXiv:2404.13076 — self-preference
+- Fanous et al., *SycEval*, arXiv:2502.08177 — 58.19% overall, 14.66% regressive
+- Wu et al., arXiv:2605.00737 — perceived vs true tool-call utility
+
+*Implicit-feedback literature*
+
+- Hassan Awadallah, Shi, Craswell, Ramsey, CIKM 2013 — reformulation 79.17% vs clicks 38.86%
+- Fox, Karnawat, Mydland, Dumais, White, TOIS 23(2) 2005 — clicked ⇒ satisfied only 39%
+- Joachims et al., SIGIR 2005 / TOIS 25(2) 2007 — pairwise preferences, 80.8%
+- Li, Huffman, Tokuda, SIGIR 2009; Williams et al., WWW 2016 — good abandonment, κ = 0.46
+- Kim, Hassan Awadallah, White, Zitouni, WSDM 2014 — dwell alone 0.5682
+- Chen, Hafeez, Paracha, *Signals*, arXiv:2604.00356 — agent trajectory triage
+- Hu, Pavlou, Zhang, CACM 52(10) 2009 — J-shape is a selection artefact
+- Netlify engineering blog (0.14%); Bob Watson, *Docs by Design* (0.03–0.04%)
 
 **Measured** — nine `claude -p` sessions, Claude Code v2.1.221, against a purpose-built
 logging Streamable HTTP MCP server. Captures quoted inline above. Probe sources and raw logs
