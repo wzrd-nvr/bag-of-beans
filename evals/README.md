@@ -31,7 +31,7 @@ well" but "did the skill change the outcome."
 
 | Case | Guards | Finding |
 | --- | --- | --- |
-| `frontier/finds-implementation-tickets` | Ticket-shape tolerance, manifest-only collisions, and premise-checking, all from one fixture corpus | B1, D1, D2/D14 |
+| `truffle-pig/finds-implementation-tickets` | Ticket-shape tolerance, manifest-only collisions, and premise-checking, all from one fixture corpus | B1, D1, D2/D14 |
 
 ## Cases worth adding next
 
@@ -55,7 +55,7 @@ Each of these is a thing that actually broke, so each is worth a case:
 
 ## Fixtures
 
-`frontier/fixtures/` holds ticket corpora as read-only inputs. They are
+`truffle-pig/fixtures/` holds ticket corpora as read-only inputs. They are
 deliberately tiny and deliberately flawed — the flaws are the point. Cases point a
 prompt at a fixture path; no `scaffold_script` is needed, and nothing writes to
 them.

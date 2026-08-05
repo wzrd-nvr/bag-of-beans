@@ -7,13 +7,13 @@ came from a field review, which finding drove it.
 
 First release. One skill.
 
-### frontier
+### truffle-pig
 
 Builds the unblocked implementation tickets on an issue tracker in parallel, one
 worktree-isolated subagent per ticket, reviewed and merged one at a time.
 
 Arrives already shaped by five rounds of real use against a live project
-(`research/frontier/field-review.md`). Notable behaviour that exists because a
+(`skills/orchestration/truffle-pig/FIELD-REVIEW.md`). Notable behaviour that exists because a
 round demanded it:
 
 - **Tolerates both local ticket shapes** — `/wayfinder` decision tickets
@@ -39,3 +39,21 @@ round demanded it:
   express, since only the scouts can see it (D16).
 - **Model-invocable, but self-invocation defaults to `--dry-run`** — read-only
   scouting runs, then it stops for a go-ahead before claiming or dispatching.
+
+Named for what it does rather than what it consumes — the earlier name,
+`frontier`, was `/wayfinder`'s word for the ticket set this skill reads, which
+named it after its input.
+
+**The name is themed; the language is not.** `SKILL.md` is a prompt, and
+everything an agent reads and acts on stays literal: scout, contradicted,
+collision, round, claim, frontier, `ENV:`. A themed vocabulary inside the
+instructions would buy flavour at the cost of making an agent translate before
+it can act, and several of those words — `ENV:`, `STATUS:`, `ready-for-agent` —
+are parsed by eval graders and the workflow script, where a synonym is a silent
+break. The theme lives at the naming layer: the skill's name, and the family of
+skills this collection grows into.
+
+During development this skill was called `frontier`, and `FIELD-REVIEW.md`
+records it under that name throughout. That text is deliberately not rewritten:
+it is a record of what happened, and findings B1–D16 are cited by id from the
+eval cases.

@@ -1,24 +1,38 @@
 ---
-name: frontier
+name: truffle-pig
 description: Use when implementation tickets already exist on the tracker and the user wants them built — reads the unblocked, unclaimed frontier and runs each ticket in its own worktree-isolated subagent in parallel, then reviews and merges them one at a time. Requires published tickets from /to-tickets. Do NOT use to plan work, to decide what to build, to build from a prose description, or against a raw /wayfinder map, whose decision tickets are human-in-the-loop and will not dispatch.
 ---
 
-# Frontier
+# Truffle Pig
 
 `/to-tickets` publishes vertical slices with blocking edges. `/wayfinder` charts the decisions above them. Neither one *builds*. This skill does: it reads the **frontier** — every ticket whose blockers are all closed and which nobody has claimed — and runs those tickets concurrently, each in its own isolated workspace.
 
 **The tracker is the only state.** There is no `.planning/` directory, no epic file tree, no local mirror of ticket status. Claims, results, and blockers are written back to the tracker as they happen, so a session that dies mid-run is resumed by re-reading the frontier. Nothing to reconcile.
 
+## Vocabulary
+
+Plain terms, used consistently. Nothing here is metaphorical — an agent acting on these instructions should never have to translate.
+
+| Term | Means |
+| --- | --- |
+| **frontier** | Every ticket whose blockers are closed and which nobody has claimed. `/wayfinder`'s word; it means the same thing here |
+| **scout** | The read-only pass over a frontier ticket, and the agent that performs it. Writes nothing |
+| **contradicted** | A ticket whose premise the codebase disproves. A fault in the ticket, not a difficulty in the work |
+| **collision** | Two tickets whose file sets intersect, so building both this round would conflict at merge |
+| **round** | One pass of the loop: read frontier, scout, claim, build, review, integrate |
+| **claim** | Marking a ticket taken on the tracker, so a concurrent session skips it |
+| **`ENV:`** | The return-contract channel for problems that are about the repo or environment, not the ticket |
+
 ## Deciding to run this yourself
 
 You may reach for this on your own judgement, but it launches a fleet of subagents that write code, create branches, and merge them. Treat the two entry paths differently.
 
-**Explicit `/frontier` is itself the go-ahead.** The user asked; run the loop.
+**Explicit `/truffle-pig` is itself the go-ahead.** The user asked; run the loop.
 
 **Self-invoked, every one of these must already be true.** If any is false, don't invoke — say what's missing instead:
 
 - Implementation tickets exist on the tracker *now*. Not a plan, not a spec, not a conversation about what to build. Tickets, on disk or on a tracker, with blocking edges.
-- At least one is unblocked and unclaimed. Zero means there is nothing to do; one means you're doing serial work with orchestration overhead, so say so rather than dressing it up as a wave.
+- At least one is unblocked and unclaimed. Zero means there is nothing to do; one means you're doing serial work with orchestration overhead, so say so rather than dressing it up as a round.
 - The user's intent is to *build*, not to decide, discuss, plan, estimate, or review. "What should we do next?" is not this skill.
 - You are in the repo those tickets describe, with a clean working tree.
 
@@ -76,17 +90,17 @@ The middle is `/to-tickets`, which converts resolved decisions into vertical imp
 ```
 /wayfinder      chart the decisions, resolve them one per session
 /to-tickets     convert the cleared route into implementation slices
-/frontier       build the unblocked slices in parallel   ← you are here
+/truffle-pig    build the unblocked slices in parallel   ← you are here
 /code-review    review before merge
 ```
 
-If the frontier query returns only `grilling` / `prototype` tickets, say so plainly and point the user at the missing step rather than dispatching the one `task` ticket and calling it a wave.
+If the frontier query returns only `grilling` / `prototype` tickets, say so plainly and point the user at the missing step rather than dispatching the one `task` ticket and calling it a round.
 
 ## Invocation
 
-- **`/frontier`** — run the loop until the frontier is empty or something needs a human.
-- **`/frontier <ticket-id>`** — work exactly that ticket, if it is genuinely unblocked. Refuse if it has an open blocker; say which.
-- **`/frontier --dry-run`** — read the frontier, scout it, print the dispatch plan (what would run in parallel, what is held back and why, what is HITL or blocked), then **stop without claiming anything**. Claiming is a write other sessions can see, so a dry run must not do it.
+- **`/truffle-pig`** — run the loop until the frontier is empty or something needs a human.
+- **`/truffle-pig <ticket-id>`** — work exactly that ticket, if it is genuinely unblocked. Refuse if it has an open blocker; say which.
+- **`/truffle-pig --dry-run`** — read the frontier, scout it, print the dispatch plan (what would run in parallel, what is held back and why, what is HITL or blocked), then **stop without claiming anything**. Claiming is a write other sessions can see, so a dry run must not do it.
 
 Run `--dry-run` first on any ticket set you haven't executed before. The scout output is the cheapest place to notice that the tickets are wrong. If you got here on your own judgement rather than an explicit invocation, `--dry-run` is the mode — see "Deciding to run this yourself".
 
@@ -101,8 +115,6 @@ Drop anything that needs a human in the loop — a ticket asking for a decision,
 Before concluding the frontier is empty, check you matched the right ticket shape. A query written for `Status: open` returns nothing against `**Status:** ready-for-agent`, and that looks exactly like "no work available." An empty result on a directory that visibly contains tickets is a parsing bug, not an empty frontier.
 
 If the frontier is genuinely empty, say so and stop. Either everything is claimed, or the rest is blocked and someone has to finish a blocker first.
-
-If the frontier is empty, say so and stop. Either everything is claimed, or the remaining tickets are blocked and someone has to finish a blocker first.
 
 ### 2. Scout every ticket
 
@@ -201,7 +213,7 @@ Free any ports you're holding before the round starts, too. A stray dev server f
 
 **Merge the branch named in the returned report**, not the branch the harness put the worktree on. Worktree isolation creates its own `worktree-agent-<hash>` branch, and the agent then creates and commits to `ticket/<id>` as the brief instructs — so both exist, and the harness one is empty. A caller looking up work by branch name can find the empty one and conclude nothing landed. The `worktree-agent-*` branches are safe to prune once integration is done.
 
-**Pick the integration target deliberately.** Merging into the base branch is the default, but a repo that wants human review before `main` should have the round land on an integration branch — `frontier/round-N` — that becomes one PR. If you do that, the round **stops there**: don't continue to tickets whose blockers merged only to the integration branch, because their base doesn't contain the work they depend on. One round per PR, then stop and hand off. State which mode you're in before you start merging, since it changes what step 7 means.
+**Pick the integration target deliberately.** Merging into the base branch is the default, but a repo that wants human review before `main` should have the round land on an integration branch — `truffle-pig/round-N` — that becomes one PR. If you do that, the round **stops there**: don't continue to tickets whose blockers merged only to the integration branch, because their base doesn't contain the work they depend on. One round per PR, then stop and hand off. State which mode you're in before you start merging, since it changes what step 7 means.
 
 **Never auto-resolve a merge conflict** in source. The one safe exception is a lockfile: regenerate it with the project's install command rather than hand-merging. Everything else — stop, leave the branch in place, report which tickets collided, and let the user decide.
 
@@ -227,7 +239,7 @@ Above roughly six tickets, hand fan-out gets unwieldy. Use the shipped script in
 
 ```
 Workflow({
-  scriptPath: "~/.claude/skills/frontier/frontier.workflow.js",
+  scriptPath: "~/.claude/skills/truffle-pig/truffle-pig.workflow.js",
   args: { baseBranch: "<base>", tickets: [{ id, title, body }, ...] }
 })
 ```

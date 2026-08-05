@@ -17,6 +17,6 @@
     "parallel-execution"
   ],
   "skills": [
-    "./skills/orchestration/frontier"
+    "./skills/orchestration/truffle-pig"
   ]
 }

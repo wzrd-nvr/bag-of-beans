@@ -19,9 +19,9 @@ Or point any Agent-Skills-compatible harness at `skills/`.
 
 | Skill | What it does |
 | --- | --- |
-| [`frontier`](skills/orchestration/frontier/SKILL.md) | Builds the unblocked implementation tickets on your issue tracker in parallel — one worktree-isolated subagent per ticket, reviewed and merged one at a time. |
+| [`truffle-pig`](skills/orchestration/truffle-pig/SKILL.md) | Builds the unblocked implementation tickets on your issue tracker in parallel — one worktree-isolated subagent per ticket, reviewed and merged one at a time. |
 
-### frontier
+### truffle-pig
 
 It fills a specific gap. Planning tools (`/wayfinder`, `/to-tickets`) produce tickets; nothing then *builds* them concurrently without either owning your whole process or inventing a second state store to coordinate agents.
 
@@ -33,7 +33,7 @@ Three decisions are load-bearing:
 
 Measured over five rounds against a real project (suite 33 → 166 tests): implementation agents burned ~297k and ~116k tokens while the orchestrator received two ~15-line reports. The most valuable thing it does turned out not to be the parallelism — it was the cheap read-only scout pass catching tickets whose premises were factually wrong before an implementation was spent on them. A third of tickets scouted were wrong.
 
-See [`skills/orchestration/frontier/FIELD-REVIEW.md`](skills/orchestration/frontier/FIELD-REVIEW.md) for the whole record, including the bugs.
+See [`skills/orchestration/truffle-pig/FIELD-REVIEW.md`](skills/orchestration/truffle-pig/FIELD-REVIEW.md) for the whole record, including the bugs.
 
 ## Repo layout
 

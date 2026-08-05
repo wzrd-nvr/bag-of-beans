@@ -11,6 +11,15 @@
 >
 > Kept unchanged: everything under "What is genuinely good".
 
+> **Naming note, 2026-08-03.** This skill is now `/truffle-pig`. Only the name
+> changed — every operative term below (scout, contradicted, collision, round,
+> claim, frontier, `ENV:`) is still current, because the skill's language is
+> deliberately literal even though its name is not.
+>
+> The text is left saying `/frontier` throughout rather than being search-replaced.
+> A field review is a record of what happened, and it happened under that name. The
+> finding ids B1–D16 are cited by the eval cases and are frozen regardless.
+
 # /frontier — field review from first attempted use
 
 Reviewer: a session driving the `majic-pencil` project through

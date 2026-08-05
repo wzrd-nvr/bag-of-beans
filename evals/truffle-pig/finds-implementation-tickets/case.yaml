@@ -1,4 +1,4 @@
-# Guards three findings from research/frontier/field-review.md — B1, D1, D2/D14.
+# Guards three findings from skills/orchestration/truffle-pig/FIELD-REVIEW.md — B1, D1, D2/D14.
 #
 # SCHEMA IS PROVISIONAL. `claude plugins eval` is early access and has not run
 # these. Field names come from its --help output (runs, model, max_turns,
@@ -19,7 +19,7 @@ timeout_seconds: 600
 # Read-only: scouting only. No scaffold_script — the fixture is committed and
 # nothing should write to it.
 prompt: |
-  The repository at evals/frontier/fixtures/impl-corpus/ has implementation
+  The repository at evals/truffle-pig/fixtures/impl-corpus/ has implementation
   tickets under issues/. Work the frontier there, in dry-run mode.
 
   Do not modify any file. Do not claim any ticket. Report what you would

@@ -1,8 +1,8 @@
 export const meta = {
-  name: 'frontier',
+  name: 'truffle-pig',
   description: 'Scout, then implement and review an unblocked ticket frontier in parallel worktrees',
   whenToUse:
-    'Invoked by the /frontier skill when the frontier is large enough that hand fan-out is unwieldy. Tickets must already be claimed on the tracker. Integration is deliberately left to the calling session.',
+    'Invoked by the /truffle-pig skill when the frontier is large enough that hand fan-out is unwieldy. Tickets must already be claimed on the tracker. Integration is deliberately left to the calling session.',
   phases: [
     { title: 'Scout', detail: 'read-only pass per ticket to find the files it would touch' },
     { title: 'Implement', detail: 'one worktree-isolated agent per non-colliding ticket' },
