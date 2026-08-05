@@ -239,10 +239,12 @@ Above roughly six tickets, hand fan-out gets unwieldy. Use the shipped script in
 
 ```
 Workflow({
-  scriptPath: "~/.claude/skills/truffle-pig/truffle-pig.workflow.js",
+  scriptPath: "<this skill's base directory>/truffle-pig.workflow.js",
   args: { baseBranch: "<base>", tickets: [{ id, title, body }, ...] }
 })
 ```
+
+The script ships next to this SKILL.md; use the base directory announced when the skill was invoked. For a marketplace install that resolves under `${CLAUDE_PLUGIN_ROOT}/skills/orchestration/truffle-pig/`, for a hand-copied install under `~/.claude/skills/truffle-pig/` — never assume the latter.
 
 Pass `conventions` with the actual convention docs this repo has, and `implEffort` / `reviewEffort` if the defaults (`high` / `medium`) don't fit. Effort is pinned rather than inherited so a session running at `xhigh` doesn't multiply that across every concurrent worktree agent. `ignoreForCollision` overrides the manifest/lockfile exclusion list if this project's ecosystem isn't covered.
 
